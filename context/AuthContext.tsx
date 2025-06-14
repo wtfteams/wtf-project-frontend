@@ -1,9 +1,9 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { secureStorage } from '../utils/secureStorage';
-import { AuthState, LoginCredentials, RegisterCredentials, User } from '../types/auth';
-import axiosInstance from '../api/axios';
+import React, { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import { Alert } from 'react-native';
+import axiosInstance from '../api/axios';
+import { AuthState, LoginCredentials, RegisterCredentials, User } from '../types/auth';
+import { secureStorage } from '../utils/secureStorage';
 
 // Define action types
 type AuthAction =

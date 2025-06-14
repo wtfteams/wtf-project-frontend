@@ -19,10 +19,8 @@ const LoginScreen: React.FC = () => {
         email: formData.email || "",
         password: formData.password || "",
       });
-      console.log("login successful", state);
       router.push("/(chats)");
     } catch (error) {
-      console.error("Login error:", error);
       console.log("state", state);
     }
   };
@@ -49,6 +47,7 @@ const LoginScreen: React.FC = () => {
         <View className="gap-8">
           <InputBox
             label="Email"
+            keyboardType="email-address"
             value={formData.email || ""}
             onChangeText={(value: string) => {
               setFormData({
@@ -61,6 +60,7 @@ const LoginScreen: React.FC = () => {
           />
           <InputBox
             label="Password"
+            secureTextEntry
             value={formData.password || ""}
             onChangeText={(value: string) => {
               setFormData({

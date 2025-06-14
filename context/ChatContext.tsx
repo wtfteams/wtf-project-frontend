@@ -1,7 +1,7 @@
 // src/context/ChatContext.tsx
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Chat, CreateChatRequest, CreateGroupRequest } from '../types/chat';
+import React, { createContext, ReactNode, useContext, useReducer } from 'react';
 import axiosInstance from '../api/axios';
+import { Chat, CreateGroupRequest } from '../types/chat';
 
 // Define the state type
 interface ChatState {
@@ -158,6 +158,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     try {
       const response = await axiosInstance.get('/chats');
       dispatch({ type: 'SET_CHATS', payload: response.data });
+      console.log('🚀 All Chats List:', response.data); // 👈 Log it here
     } catch (error: any) {
       console.error('Error fetching chats:', error);
       dispatch({

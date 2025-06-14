@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
-import { View, Text, TouchableOpacity, TextInput } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import FeatherIcons from "../build-elements/FeatherIcons";
 
 interface Props {
@@ -110,6 +110,7 @@ export default function InputBox({
           onBlur={handleBlur}
           multiline={multiline}
           textAlignVertical={multiline ? "top" : textAlignVertical}
+          autoCapitalize="none"
           maxLength={maxLength}
           style={{ 
             height: multiline && height ? height : undefined,

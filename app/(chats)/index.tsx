@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Header } from '@/components';
 import { useChat } from '@/context/ChatContext';
 import { useSocket } from '@/context/SocketContext';
-import { Header } from '@/components';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useEffect } from 'react';
+import { FlatList, Image, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 const ChatListScreen = () => {
@@ -16,6 +16,7 @@ const ChatListScreen = () => {
     // Wrap in try/catch to prevent crashes
     try {
       getChats();
+      
     } catch (error) {
       console.error("Error fetching chats:", error);
     }
