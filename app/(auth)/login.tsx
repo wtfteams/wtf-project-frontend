@@ -1,9 +1,10 @@
 import { Button, Header, InputBox } from "@/components";
 import { useAuth } from "@/context/AuthContext";
 import { FormData } from "@/types/common";
+import { secureStorage } from "@/utils/secureStorage";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Text, View } from "react-native";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 
 const LoginScreen: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
@@ -22,6 +23,28 @@ const LoginScreen: React.FC = () => {
       router.push("/(chats)");
     } catch (error) {
       console.log("state", state);
+    }
+  };
+
+  const clearStorageHandler = async () => {
+    try {
+      // Step 1: Remove the stored authentication token
+      await secureStorage.removeItem('token');
+      
+      // Step 2: Remove the stored user data
+      await secureStorage.removeItem('user');
+      
+      // Step 3: Show confirmation to developer
+      Alert.alert('Storage cleared');
+      
+      // What happens next:
+      // - The app will no longer find stored credentials
+      // - User will be logged out on next app restart/reload
+      // - You can now login with a different user account
+      
+    } catch (error) {
+      console.error('Error clearing storage:', error);
+      Alert.alert('Error', 'Failed to clear storage');
     }
   };
 
@@ -97,6 +120,18 @@ const LoginScreen: React.FC = () => {
             <Text className="font-poppins-regular text-xs tracking-wider text-secondary text-center">
               Login With Passkey
             </Text>
+
+            {/* ADD THIS DEVELOPMENT BUTTON */}
+            {__DEV__ && (
+              <TouchableOpacity
+                onPress={clearStorageHandler}
+                className="bg-red-500 py-3 px-4 rounded-lg mt-4"
+              >
+                <Text className="text-white text-center font-poppins-semibold">
+                  🗑️ Clear Storage (Dev Only)
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

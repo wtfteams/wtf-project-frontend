@@ -1,10 +1,11 @@
 import { Button, Header, InputBox, PhoneInput } from "@/components";
 import TabBar from "@/components/form-elements/TabBar";
 import { useAuth } from "@/context/AuthContext";
+import { useAuthStore } from "@/store/useAuthStore";
 import { FormData } from "@/types/common";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Text, View } from "react-native";
+import { Alert, Text, View } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 
 const RegisterScreen = () => {
@@ -15,6 +16,7 @@ const RegisterScreen = () => {
   });
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activeTab, setActiveTab] = React.useState("email");
+  const { signup, isSigningUp } = useAuthStore();
 
   const tabs = [
     { 
@@ -45,20 +47,16 @@ const RegisterScreen = () => {
     if (activeTab === "email") {
       try {
         if (!formData.name || !formData.email || !formData.password) {
-          console.warn(
+          Alert.alert(
             "Missing required fields for email registration",
-            formData
+           `${formData}`
           );
           return;
         }
-        await register({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        });
+        await signup(formData)
         router.push("/(auth)/login");
       } catch (error) {
-        console.error("Registration error:", error);
+        Alert.alert("Registration error:", `${error}`);
       }
     }
   };

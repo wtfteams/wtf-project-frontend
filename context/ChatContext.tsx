@@ -52,7 +52,7 @@ type ChatContextType = {
 const ChatContext = createContext<ChatContextType>({
   state: initialState,
   getChats: async () => {},
-  accessChat: async () => ({ _id: '', chatName: '', users: [], isGroupChat: false, createdAt: new Date(), updatedAt: new Date() }),
+  accessChat: async () => { throw new Error('accessChat not implemented'); },
   selectChat: () => {},
   createGroupChat: async () => {},
   renameGroupChat: async () => {},
@@ -158,7 +158,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     try {
       const response = await axiosInstance.get('/chats');
       dispatch({ type: 'SET_CHATS', payload: response.data });
-      console.log('🚀 All Chats List:', response.data); // 👈 Log it here
     } catch (error: any) {
       console.error('Error fetching chats:', error);
       dispatch({

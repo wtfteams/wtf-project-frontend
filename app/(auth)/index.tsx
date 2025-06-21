@@ -1,8 +1,7 @@
-import { View, Text, Button, SafeAreaView } from "react-native";
-import React from "react";
+import { InputBox } from "@/components";
 import { router } from "expo-router";
-import { useState } from "react";
-import { FeatherIcons, InputBox } from "@/components";
+import React, { useState } from "react";
+import { Button, SafeAreaView, Text, View } from "react-native";
 
 const LoginScreen = () => {
   const [formData, setFormData] = useState({

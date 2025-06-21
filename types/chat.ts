@@ -3,6 +3,7 @@ import { User } from './auth';
 import { Message } from './message';
 
 export interface Chat {
+  chatImage: any;
   _id: string;
   chatName: string;
   isGroupChat: boolean;

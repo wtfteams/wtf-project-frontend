@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { useChat } from '@/context/ChatContext';
-import { Header } from '@/components';
 import axiosInstance from '@/api/axios';
+import { Header } from '@/components';
+import { useChat } from '@/context/ChatContext';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const UserSearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,7 +15,6 @@ const UserSearchScreen = () => {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    
     setLoading(true);
     try {
       const response = await axiosInstance.get(`/users?search=${searchQuery}`);
@@ -30,7 +29,7 @@ const UserSearchScreen = () => {
   const handleUserSelect = async (userId:any) => {
     try {
       setLoading(true);
-      const chat = await accessChat(userId);
+      await accessChat(userId);
       router.push('/(chats)/chat-detail');
     } catch (error) {
       console.error('Error accessing chat:', error);
@@ -51,6 +50,7 @@ const UserSearchScreen = () => {
               placeholder="Search users..."
               placeholderTextColor="#999"
               value={searchQuery}
+              autoCapitalize="none"
               onChangeText={setSearchQuery}
               onSubmitEditing={handleSearch}
             />
@@ -65,7 +65,7 @@ const UserSearchScreen = () => {
         ) : (
           <FlatList
             data={users}
-            keyExtractor={(item:any) => item._id }
+            keyExtractor={(user:any) => user._id }
             renderItem={({ item }) => (
               <TouchableOpacity 
                 className="flex-row items-center p-4 border-b border-gray-700"
