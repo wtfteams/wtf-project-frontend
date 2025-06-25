@@ -25,7 +25,7 @@ interface AuthState {
   disconnectSocket: () => void;
 }
 
-const BASE_URL ="http://localhost:5001" ;
+const BASE_URL = "http://localhost:5001";
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   authUser: null,
@@ -53,11 +53,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isSigningUp: true });
     try {
       const res = await axiosInstance.post("/auth/signup", data);
+      console.log("res", res);
+
       set({ authUser: res.data });
       console.log("Account created successfully");
       get().connectSocket();
     } catch (error: any) {
-      console.log("Signup error:", error.response.data.message);
+      console.error("Signup error:", error);
+      const errorMessage =
+        error.response?.data?.message || "Registration failed";
+      console.log("Signup error:", errorMessage);
+      throw new Error(errorMessage);
     } finally {
       set({ isSigningUp: false });
     }
@@ -72,6 +78,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       get().connectSocket();
     } catch (error: any) {
       console.log("Login error:", error.response.data.message);
+      const errorMessage =
+      error.response?.data?.message || "Login failed";
+      throw new Error(errorMessage);
     } finally {
       set({ isLoggingIn: false });
     }

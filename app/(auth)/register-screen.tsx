@@ -1,10 +1,10 @@
+import React, { useState } from "react";
+
 import { Button, Header, InputBox, PhoneInput } from "@/components";
 import TabBar from "@/components/form-elements/TabBar";
-import { useAuth } from "@/context/AuthContext";
 import { useAuthStore } from "@/store/useAuthStore";
 import { FormData } from "@/types/common";
 import { router } from "expo-router";
-import React, { useState } from "react";
 import { Alert, Text, View } from "react-native";
 import { moderateScale } from "react-native-size-matters";
 
@@ -13,60 +13,93 @@ const RegisterScreen = () => {
     name: "",
     email: "",
     password: "",
+    phone:""
   });
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [formError, setFormError] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone:"",
+    general: "",
+  });
   const [activeTab, setActiveTab] = React.useState("email");
+
   const { signup, isSigningUp } = useAuthStore();
 
   const tabs = [
-    { 
-      id: "email-tab", 
-      label: "Email", 
-      value: "email" 
+    {
+      id: "email-tab",
+      label: "Email",
+      value: "email",
     },
-    { 
-      id: "phone-tab", 
-      label: "Phone", 
-      value: "phone" 
+    {
+      id: "phone-tab",
+      label: "Phone",
+      value: "phone",
     },
   ];
 
-  const { register, state } = useAuth();
-  const isLoading = state?.isLoading ?? false;
+  const validateEmailForm = () => {
+    const errors = {
+      name: !formData.name ? "Name is required" : "",
+      email: !formData.email
+        ? "Email is required"
+        : !/^\S+@\S+\.\S+$/.test(formData.email)
+        ? "Invalid email format"
+        : "",
+      password: !formData.password
+        ? "Password is required"
+        : formData.password.length < 6
+        ? "Password must be at least 6 characters"
+        : "",
+      phone: "",
+      general: "",
+    };
+    setFormError(errors as any);
+    return !errors.name && !errors.email && !errors.password;
+  };
+
+  const validatePhoneForm = () => {
+    const errors = {
+      name: "",
+      email: "",
+      password: "",
+      phone: !formData.phone
+        ? "Phone number is required"
+        : formData.phone.length < 10
+        ? "Invalid phone number"
+        : "",
+      general: "",
+    };
+    setFormError(errors as any);
+    return !errors.phone;
+  };
 
   const handleRegister = async () => {
     if (activeTab === "phone") {
-      if (!phoneNumber) {
-        console.warn("Phone number is required for phone registration");
-        return;
-      }
-      console.warn("Phone registration not implemented yet");
+      if (!validatePhoneForm()) return;
+      Alert.alert("Info", "Phone registration not implemented yet");
       return;
     }
 
     if (activeTab === "email") {
       try {
-        if (!formData.name || !formData.email || !formData.password) {
-          Alert.alert(
-            "Missing required fields for email registration",
-           `${formData}`
-          );
-          return;
+        if (!validateEmailForm()) return;
+        const signupData = {
+          fullName: formData.name,
+          email: formData.email,
+          password: formData.password,
+        };
+        await signup(signupData);
+        const { authUser } = useAuthStore.getState();
+        if (authUser) {
+          router.push("/(auth)/login");
         }
-        await signup(formData)
-        router.push("/(auth)/login");
-      } catch (error) {
-        Alert.alert("Registration error:", `${error}`);
+      } catch (error: any) {
+        setFormError({...formError,general : error.message})
+        Alert.alert("Error", error.message || "Registration failed");
       }
     }
-  };
-
-  const getErrorMessage = (field: keyof FormData) => {
-    if (!state?.error) return "";
-    const error = Array.isArray(state.error)
-      ? state.error.find((err: any) => err.path === field)
-      : null;
-    return error ? error.msg : "";
   };
 
   const displayInputBox = () => {
@@ -75,14 +108,13 @@ const RegisterScreen = () => {
         return (
           <View className="gap-4">
             <PhoneInput
-              value={phoneNumber}
-              onChangePhone={setPhoneNumber}
+              value={formData.phone}
+              onChangePhone ={(value: string) =>
+                setFormData({ ...formData, phone: value })
+              }
               placeholder="Phone number"
+              error={formError.phone}
             />
-            {/* Add phone-specific error handling if needed */}
-            {typeof state.error === "string" && (
-              <Text className="text-red-500 text-sm mt-1">{state.error}</Text>
-            )}
           </View>
         );
       case "email":
@@ -94,7 +126,7 @@ const RegisterScreen = () => {
               onChangeText={(value: string) =>
                 setFormData({ ...formData, name: value })
               }
-              error={getErrorMessage("name")}
+              error={formError.name}
               className="!mb-0"
             />
             <InputBox
@@ -103,7 +135,7 @@ const RegisterScreen = () => {
               onChangeText={(value: string) =>
                 setFormData({ ...formData, email: value })
               }
-              error={getErrorMessage("email")}
+              error={formError.email}
               className="!mb-0"
             />
             <InputBox
@@ -112,12 +144,12 @@ const RegisterScreen = () => {
               onChangeText={(value: string) =>
                 setFormData({ ...formData, password: value })
               }
-              error={getErrorMessage("password")}
+              error={formError.password}
               className="!mb-0"
               secureTextEntry
             />
-            {typeof state.error === "string" && (
-              <Text className="text-red-500 text-sm mt-1">{state.error}</Text>
+            {formError.general && (
+              <Text className="text-red-500 text-sm mt-1">{formError.general}</Text>
             )}
           </View>
         );
@@ -142,18 +174,6 @@ const RegisterScreen = () => {
         return "Next";
     }
   };
-
-  // Helper function to check if form is valid
-  const isFormValid = () => {
-    if (activeTab === "email") {
-      return formData.name && formData.email && formData.password;
-    }
-    if (activeTab === "phone") {
-      return phoneNumber;
-    }
-    return false;
-  };
-
   return (
     <View className="flex-1 bg-[#192230] px-5">
       <Header />
@@ -175,9 +195,9 @@ const RegisterScreen = () => {
             padding={4}
             testID="registration-tabs"
           />
-          
+
           {displayInputBox()}
-          
+
           <Button
             text={getButtonText()}
             buttonColor="bg-secondary"
@@ -185,7 +205,7 @@ const RegisterScreen = () => {
             onPress={handleRegister}
             className="rounded-[38px]"
             textClassName="font-poppins-semibold text-base tracking-wider"
-            loading={isLoading}
+            // loading={isLoading}
           />
         </View>
       </View>

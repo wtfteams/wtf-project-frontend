@@ -1,58 +1,74 @@
-import { Button, Header, InputBox } from "@/components";
-import { useAuth } from "@/context/AuthContext";
-import { FormData } from "@/types/common";
-import { secureStorage } from "@/utils/secureStorage";
-import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Text, TouchableOpacity, View } from "react-native";
+
+import { Button, Header, InputBox } from "@/components";
+import { useAuthStore } from "@/store/useAuthStore";
+import { FormData } from "@/types/common";
+import { router } from "expo-router";
+import { Alert, Text, View } from "react-native";
 
 const LoginScreen: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     email: "",
+    phone: "",
+    password: "",
   });
-  // Use the auth context
-  const { login, state } = useAuth();
-  const isLoading = state.isLoading;
+  const [formError, setFormError] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    general: "",
+  });
+
+  const { login } = useAuthStore();
+
+  const validateEmailForm = () => {
+    const errors = {
+      email: !formData.email
+        ? "Email is required"
+        : !/^\S+@\S+\.\S+$/.test(formData.email)
+        ? "Invalid email format"
+        : "",
+      password: !formData.password
+        ? "Password is required"
+        : formData.password.length < 6
+        ? "Password must be at least 6 characters"
+        : "",
+      phone: "",
+      general: "",
+    };
+    setFormError(errors as any);
+    return !errors.email && !errors.password;
+  };
+
+  const validatePhoneForm = () => {
+    const errors = {
+      name: "",
+      email: "",
+      password: "",
+      phone: !formData.phone
+        ? "Phone number is required"
+        : formData.phone.length < 10
+        ? "Invalid phone number"
+        : "",
+      general: "",
+    };
+    setFormError(errors as any);
+    return !errors.phone;
+  };
 
   const handleLogin = async () => {
     try {
-      await login({
-        email: formData.email || "",
-        password: formData.password || "",
-      });
-      router.push("/(chats)");
-    } catch (error) {
-      console.log("state", state);
+      if (!validateEmailForm()) return;
+      await login(formData);
+      const { authUser } = useAuthStore.getState();
+      if (authUser) {
+        router.push("/(chats)");
+      }
+    } catch (error: any) {
+      setFormError({ ...formError, general: error.message });
+      Alert.alert("client login");
     }
-  };
-
-  const clearStorageHandler = async () => {
-    try {
-      // Step 1: Remove the stored authentication token
-      await secureStorage.removeItem('token');
-      
-      // Step 2: Remove the stored user data
-      await secureStorage.removeItem('user');
-      
-      // Step 3: Show confirmation to developer
-      Alert.alert('Storage cleared');
-      
-      // What happens next:
-      // - The app will no longer find stored credentials
-      // - User will be logged out on next app restart/reload
-      // - You can now login with a different user account
-      
-    } catch (error) {
-      console.error('Error clearing storage:', error);
-      Alert.alert('Error', 'Failed to clear storage');
-    }
-  };
-
-  const getErrorMessage = (field: any) => {
-    const error = Array.isArray(state.error)
-      ? state.error.find((err: any) => err.path === field)
-      : null;
-    return error ? error.msg : "";
   };
 
   return (
@@ -71,41 +87,41 @@ const LoginScreen: React.FC = () => {
           <InputBox
             label="Email"
             keyboardType="email-address"
-            value={formData.email || ""}
+            value={formData.email}
             onChangeText={(value: string) => {
               setFormData({
                 ...formData,
                 email: value,
               });
             }}
-            error={getErrorMessage("email")}
+            error={formError.email}
             className="!mb-0"
           />
           <InputBox
             label="Password"
             secureTextEntry
-            value={formData.password || ""}
+            value={formData.password}
             onChangeText={(value: string) => {
               setFormData({
                 ...formData,
                 password: value,
               });
             }}
-            error={getErrorMessage("password")}
+            error={formError.password}
             className="!mb-0"
           />
-
-          <View className="gap-2 flex-row justify-between items-center">
-            <Text className="font-poppins-regular text-xs tracking-wider text-secondary">
-              Forgot your password ?
-            </Text>
-            <View>
-              {typeof state.error === "string" && (
-                <Text className="text-red-500 text-sm mt-1 items-center flex-row justify-center align-middle">
-                  {state.error}
-                </Text>
-              )}
+          <View className="flex-row justify-between">
+            <View className="gap-2 flex-row justify-between items-center">
+              <Text className="font-poppins-regular text-xs tracking-wider text-secondary">
+                Forgot your password ?
+              </Text>
+              <View></View>
             </View>
+            {formError.general && (
+              <Text className="text-red-500 text-sm mt-1">
+                {formError.general}
+              </Text>
+            )}
           </View>
           <View className="gap-5">
             <Button
@@ -115,23 +131,11 @@ const LoginScreen: React.FC = () => {
               onPress={handleLogin}
               className="rounded-[38px]"
               textClassName="font-poppins-semibold text-base tracking-wider"
-              loading={isLoading}
+              // loading={isLoading}
             />
             <Text className="font-poppins-regular text-xs tracking-wider text-secondary text-center">
               Login With Passkey
             </Text>
-
-            {/* ADD THIS DEVELOPMENT BUTTON */}
-            {__DEV__ && (
-              <TouchableOpacity
-                onPress={clearStorageHandler}
-                className="bg-red-500 py-3 px-4 rounded-lg mt-4"
-              >
-                <Text className="text-white text-center font-poppins-semibold">
-                  🗑️ Clear Storage (Dev Only)
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </View>

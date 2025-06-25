@@ -4,14 +4,18 @@ import { useAuthStore } from "./useAuthStore";
 
 interface User {
   _id: string;
-  // Add other user properties as needed
+  fullName?: string;
+  name?: string;
+  profilePic?: string;
   [key: string]: any;
 }
 
 interface Message {
   _id: string;
   senderId: string;
-  // Add other message properties as needed
+  text?: string;
+  image?: string;
+  createdAt: string; 
   [key: string]: any;
 }
 
@@ -21,11 +25,15 @@ interface ChatState {
   selectedUser: User | null;
   isUsersLoading: boolean;
   isMessagesLoading: boolean;
+  isOtherUserTyping: boolean; 
   getUsers: () => Promise<void>;
   getMessages: (userId: string) => Promise<void>;
   sendMessage: (messageData: any) => Promise<void>;
   subscribeToMessages: () => void;
   unsubscribeFromMessages: () => void;
+  subscribeToTyping: () => void;
+  unsubscribeFromTyping: () => void;
+  emitTyping: (isTyping: boolean) => void;
   setSelectedUser: (selectedUser: User | null) => void;
 }
 
@@ -35,6 +43,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
+  isOtherUserTyping: false,
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -63,7 +72,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: async (messageData) => {
     const { selectedUser, messages } = get();
     try {
-      const res = await axiosInstance.post(`/messages/send/${selectedUser?._id}`, messageData);
+      const res = await axiosInstance.post(
+        `/messages/send/${selectedUser?._id}`,
+        messageData
+      );
       set({ messages: [...messages, res.data] });
     } catch (error: any) {
       console.error("Error sending message:", error.response.data.message);
@@ -77,7 +89,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = useAuthStore.getState().socket;
 
     socket?.on("newMessage", (newMessage: Message) => {
-      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
+      const isMessageSentFromSelectedUser =
+        newMessage.senderId === selectedUser._id;
       if (!isMessageSentFromSelectedUser) return;
 
       set({
@@ -89,6 +102,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
     socket?.off("newMessage");
+  },
+
+  subscribeToTyping: () => {
+    const socket = useAuthStore.getState().socket;
+
+    socket?.on("userTyping", (data) => {
+      const { selectedUser } = get();
+      if (data.userId === selectedUser?._id) {
+        set({ isOtherUserTyping: data.isTyping });
+      }
+    });
+  },
+
+  unsubscribeFromTyping: () => {
+    const socket = useAuthStore.getState().socket;
+    socket?.off("userTyping");
+  },
+
+  emitTyping: (isTyping: boolean) => {
+    const { selectedUser } = get();
+    const { authUser, socket } = useAuthStore.getState();
+
+    if (selectedUser && authUser && socket) {
+      socket.emit(isTyping ? "typing" : "stopTyping", {
+        userId: authUser._id,
+        receiverId: selectedUser._id,
+      });
+    }
   },
 
   setSelectedUser: (selectedUser) => set({ selectedUser }),

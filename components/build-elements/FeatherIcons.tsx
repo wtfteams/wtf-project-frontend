@@ -1,7 +1,7 @@
 import React from "react";
 
 import { View } from "react-native";
-import Svg, { Path, Line, Circle } from "react-native-svg";
+import Svg, { Circle, Line, Path } from "react-native-svg";
 
 interface Props {
   icon?: string;
@@ -273,23 +273,41 @@ export default function FeatherIcons({
       case "rupee-icon":
         return (
           <Svg
-          width={iconWidth}
-          height={iconHeight}
-          viewBox="0 0 32 32"
-          fill={iconFillColor}
-          stroke={iconStrokeColor}
-          strokeWidth={iconStrokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <Path
-            d="M6 4h4.5m0 0a4.5 4.5 0 110 9H6l7 7M10.5 4H18M6 8.5h12"
-            stroke="#ffffff"
-            strokeWidth={2}
+            width={iconWidth}
+            height={iconHeight}
+            viewBox="0 0 32 32"
+            fill={iconFillColor}
+            stroke={iconStrokeColor}
+            strokeWidth={iconStrokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
-          />
-        </Svg>
+          >
+            <Path
+              d="M6 4h4.5m0 0a4.5 4.5 0 110 9H6l7 7M10.5 4H18M6 8.5h12"
+              stroke="#ffffff"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+        );
+
+      case "search-icon":
+        return (
+          <Svg
+            width={iconWidth}
+            height={iconHeight}
+            viewBox="0 0 24 24"
+            fill={iconFillColor}
+          >
+            <Path
+              d="M16.893 16.92L19.973 20M19 11.5C19 13.4891 18.2098 15.3968 16.8033 16.8033C15.3968 18.2098 13.4891 19 11.5 19C9.51088 19 7.60322 18.2098 6.1967 16.8033C4.79018 15.3968 4 13.4891 4 11.5C4 9.51088 4.79018 7.60322 6.1967 6.1967C7.60322 4.79018 9.51088 4 11.5 4C13.4891 4 15.3968 4.79018 16.8033 6.1967C18.2098 7.60322 19 9.51088 19 11.5Z"
+              stroke={iconStrokeColor}
+              strokeWidth={iconStrokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
         );
 
       default:

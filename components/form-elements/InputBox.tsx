@@ -8,7 +8,7 @@ interface Props {
   label?: string;
   placeholder?: string;
   description?: string;
-  value: string;
+  value: string | undefined;
   onChangeText: (text: string) => void;
   secureTextEntry?: boolean;
   keyboardType?: "default" | "numeric" | "email-address" | "phone-pad";
@@ -119,7 +119,7 @@ export default function InputBox({
         />
 
         {/* Clear Button (only visible when there's text) */}
-        {value.length > 0 && (
+        {value && value.length > 0 && (
           <TouchableOpacity
             onPress={handleClear}
             className={`mr-2 rounded-full bg-fourth w-7 h-7 flex items-center justify-center  ${multiline ? "mb-auto mt-3" : ""}`}

@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 
+import { Feather } from "@expo/vector-icons";
 import {
-  View,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Modal,
-  SafeAreaView,
-  Platform,
+  View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
 
 interface Country {
   name: string;
@@ -33,8 +33,8 @@ const countries: Country[] = [
 ];
 
 interface PhoneInputProps {
-  value: string;
-  onChangePhone: (phoneNumber: string) => void;
+  value: string | undefined;
+  onChangePhone: (phone: string) => void ;
   onChangeCountry?: (country: Country) => void;
   placeholder?: string;
   containerClassName?: string;

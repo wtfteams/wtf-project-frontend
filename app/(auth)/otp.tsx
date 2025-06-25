@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 import { router } from "expo-router";
-import { View, Text } from "react-native";
+import { Text, View } from "react-native";
 
 import { Button, Header, OtpInputBox } from "@/components";
 import { moderateScale } from "react-native-size-matters";
@@ -51,8 +51,7 @@ export default function OtpScreen() {
             text="Confirm"
             buttonColor="bg-[#FFCD00]"
             textColor="text-black"
-            onPress={()=> router.push("/(auth)/setup-two-factor")}
-            // onPress={() => router.push("/(auth)/create-account-screen")}
+            onPress={() => router.push("/(auth)/create-account-screen")}
             className="rounded-[38px] w-1/2"
             textClassName="font-poppins-semibold text-base tracking-wider"
           />
