@@ -1,11 +1,12 @@
+// useChatStore.ts
 import { axiosInstance } from "@/api/axios";
 import { create } from "zustand";
 import { useAuthStore } from "./useAuthStore";
 
 interface User {
   _id: string;
-  fullName?: string;
-  name?: string;
+  fullName: string;
+  email: string;
   profilePic?: string;
   [key: string]: any;
 }
@@ -13,22 +14,27 @@ interface User {
 interface Message {
   _id: string;
   senderId: string;
+  receiverId: string;
   text?: string;
   image?: string;
-  createdAt: string; 
+  createdAt: string;
   [key: string]: any;
 }
 
 interface ChatState {
   messages: Message[];
   users: User[];
+  searchResults: User[]; // New state for search results
   selectedUser: User | null;
   isUsersLoading: boolean;
   isMessagesLoading: boolean;
-  isOtherUserTyping: boolean; 
+  isOtherUserTyping: boolean;
+  isSearchingUsers: boolean; // New state for search loading
   getUsers: () => Promise<void>;
   getMessages: (userId: string) => Promise<void>;
-  sendMessage: (messageData: any) => Promise<void>;
+  sendMessage: (messageData: { text?: string; image?: string }) => Promise<void>;
+  searchUsers: (query: string) => Promise<void>; // New method for searching users
+  sendFriendRequest: (receiverId: string) => Promise<void>; // New method for sending friend requests
   subscribeToMessages: () => void;
   unsubscribeFromMessages: () => void;
   subscribeToTyping: () => void;
@@ -40,10 +46,12 @@ interface ChatState {
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   users: [],
+  searchResults: [], // Initialize search results
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
   isOtherUserTyping: false,
+  isSearchingUsers: false, // Initialize search loading state
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -51,7 +59,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const res = await axiosInstance.get("/messages/users");
       set({ users: res.data });
     } catch (error: any) {
-      console.error("Error fetching users:", error.response.data.message);
+      console.error("Error fetching users:", error.response?.data?.message || error.message);
     } finally {
       set({ isUsersLoading: false });
     }
@@ -63,7 +71,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const res = await axiosInstance.get(`/messages/${userId}`);
       set({ messages: res.data });
     } catch (error: any) {
-      console.error("Error fetching messages:", error.response.data.message);
+      console.error("Error fetching messages:", error.response?.data?.message || error.message);
     } finally {
       set({ isMessagesLoading: false });
     }
@@ -71,14 +79,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   sendMessage: async (messageData) => {
     const { selectedUser, messages } = get();
+    if (!selectedUser) return;
     try {
-      const res = await axiosInstance.post(
-        `/messages/send/${selectedUser?._id}`,
-        messageData
-      );
+      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
       set({ messages: [...messages, res.data] });
     } catch (error: any) {
-      console.error("Error sending message:", error.response.data.message);
+      console.error("Error sending message:", error.response?.data?.message || error.message);
+    }
+  },
+
+  searchUsers: async (query: string) => {
+    set({ isSearchingUsers: true });
+    try {
+      const res = await axiosInstance.get(`/friends/search?query=${encodeURIComponent(query)}`);
+      set({ searchResults: res.data });
+    } catch (error: any) {
+      console.error("Error searching users:", error.response?.data?.message || error.message);
+    } finally {
+      set({ isSearchingUsers: false });
+    }
+  },
+
+  sendFriendRequest: async (receiverId: string) => {
+    try {
+      const res = await axiosInstance.post(`/friends/send/${receiverId}`);
+      console.log(res.data.message); 
+      const { socket, authUser } = useAuthStore.getState();
+      if (socket && authUser) {
+        socket.emit("sendFriendRequest", {
+          senderId: authUser._id,
+          receiverId,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error sending friend request:", error.response?.data?.message || error.message);
+      throw new Error(error.response?.data?.message || "Failed to send friend request");
     }
   },
 
@@ -89,8 +124,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = useAuthStore.getState().socket;
 
     socket?.on("newMessage", (newMessage: Message) => {
-      const isMessageSentFromSelectedUser =
-        newMessage.senderId === selectedUser._id;
+      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
       if (!isMessageSentFromSelectedUser) return;
 
       set({

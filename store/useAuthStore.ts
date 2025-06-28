@@ -23,6 +23,10 @@ interface AuthState {
   updateProfile: (formData: FormData) => Promise<void>;
   connectSocket: () => void;
   disconnectSocket: () => void;
+  friendRequests: AuthUser[]; // New state for friend requests
+  getFriendRequests: () => Promise<void>; // New method to fetch friend requests
+  subscribeToFriendRequests: () => void; // New method to subscribe to friend request notifications
+  unsubscribeFromFriendRequests: () => void; // New method to unsubscribe
 }
 
 const BASE_URL = "http://localhost:5001";
@@ -35,6 +39,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isCheckingAuth: true,
   onlineUsers: [],
   socket: null,
+  friendRequests: [],
+
 
   checkAuth: async () => {
     try {
@@ -119,6 +125,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  getFriendRequests: async () => {
+    try {
+      const res = await axiosInstance.get("/friends/requests");
+      set({ friendRequests: res.data });
+    } catch (error: any) {
+      console.error("Error fetching friend requests:", error.response?.data?.message || error.message);
+    }
+  },
+
+  subscribeToFriendRequests: () => {
+    const socket = get().socket;
+    socket?.on("newFriendRequest", (data: { senderId: string; message: string }) => {
+      // Fetch updated friend requests
+      get().getFriendRequests();
+    });
+  },
+
+  unsubscribeFromFriendRequests: () => {
+    const socket = get().socket;
+    socket?.off("newFriendRequest");
+  },
+
   connectSocket: () => {
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
@@ -135,9 +163,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     socket.on("getOnlineUsers", (userIds: string[]) => {
       set({ onlineUsers: userIds });
     });
+    // Subscribe to friend requests when socket connects
+    get().subscribeToFriendRequests();
   },
 
   disconnectSocket: () => {
-    if (get().socket?.connected) get().socket?.disconnect();
+    if (get().socket?.connected) {
+      get().unsubscribeFromFriendRequests();
+      get().socket?.disconnect();
+    }
   },
 }));

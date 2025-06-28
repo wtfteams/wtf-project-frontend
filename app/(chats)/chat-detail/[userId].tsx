@@ -5,16 +5,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale } from "react-native-size-matters";
@@ -22,7 +22,7 @@ import { moderateScale } from "react-native-size-matters";
 interface Message {
   _id: string;
   text?: string;
-  image?: string;
+  image?: string | null | undefined;
   senderId: string;
   createdAt: string;
 }
@@ -101,7 +101,7 @@ const ChatDetailScreen = () => {
     try {
       await sendMessage({
         text: messageText,
-        image: null,
+        image: "",
       });
     } catch (error) {
       Alert.alert("Error", "Failed to send message. Please try again.");

@@ -1,3 +1,4 @@
+// app/(chats)/chat-list.tsx
 import { FeatherIcons, Header } from "@/components";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useChatStore } from "@/store/useChatStore";
@@ -14,10 +15,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+interface User {
+  _id: string;
+  fullName: string;
+  email: string;
+  profilePic?: string;
+}
+
 const ChatListScreen = () => {
-  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } =
-    useChatStore();
-  const { onlineUsers } = useAuthStore();
+  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
+  const { onlineUsers, friendRequests } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
   useEffect(() => {
@@ -28,13 +35,12 @@ const ChatListScreen = () => {
     ? users.filter((user) => onlineUsers.includes(user._id))
     : users;
 
-  const handleUserPress = (user: any) => {
+  const handleUserPress = (user: User) => {
     setSelectedUser(user);
-    // Navigate to chat screen or handle user selection
-    router.push(`/(chats)/chat-detail/${user._id}` as any) ;
+    router.push(`/(chats)/chat-detail/${user._id}` as any);
   };
 
-  const renderUserItem = ({ item }: { item: any }) => {
+  const renderUserItem = ({ item }: { item: User }) => {
     const isOnline = onlineUsers.includes(item._id);
     const isSelected = selectedUser?._id === item._id;
 
@@ -61,14 +67,11 @@ const ChatListScreen = () => {
             <View className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
           )}
         </View>
-
         <View className="flex-1 ml-3">
           <Text className="text-[16px] font-poppins-regular tracking-wider text-white">
-            {item.fullName || item.name}
+            {item.fullName}
           </Text>
-          <Text className="text-sm text-gray-400">
-            {isOnline ? "Online" : "Offline"}
-          </Text>
+          <Text className="text-sm text-gray-400">{isOnline ? "Online" : "Offline"}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -89,12 +92,11 @@ const ChatListScreen = () => {
   return (
     <View className="flex-1 bg-primary px-5">
       <Header />
-
       <View className="flex-1 gap-11">
         {/* Action Buttons */}
         <View className="flex-row items-center justify-between gap-[10px]">
           <TouchableOpacity
-            className="flex-1 flex-row items-center justify-start  bg-tertiary py-2 px-3 rounded-[20px]"
+            className="flex-1 flex-row items-center justify-start bg-tertiary py-2 px-3 rounded-[20px]"
             onPress={() => router.push("/(chats)/user-search")}
           >
             <FeatherIcons
@@ -103,22 +105,23 @@ const ChatListScreen = () => {
               iconHeight={24}
               iconStrokeColor="white"
             />
-            <Text className="text-white text-xs font-poppins-regular tracking-wider  ml-3">
+            <Text className="text-white text-xs font-poppins-regular tracking-wider ml-3">
               Search
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             className="flex-1 flex-row items-center justify-center bg-tertiary py-2 px-3 rounded-[20px]"
-            onPress={() => router.push("/(chats)/create-group")}
+            onPress={() => router.push("/(chats)/friend-requests")}
           >
             <Ionicons name="people" size={24} color="white" />
-            <Text className="text-white text-xs font-poppins-regular tracking-wider  ml-3">
-              Add friends
+            <Text className="text-white text-xs font-poppins-regular tracking-wider ml-3">
+              Friend Requests
+              {friendRequests.length > 0 && (
+                <Text className="ml-2 text-red-500">({friendRequests.length})</Text>
+              )}
             </Text>
           </TouchableOpacity>
         </View>
-
         {/* Users List */}
         <FlatList
           data={filteredUsers}
