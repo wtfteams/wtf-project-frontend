@@ -24,34 +24,68 @@ interface Message {
 interface ChatState {
   messages: Message[];
   users: User[];
-  searchResults: User[]; // New state for search results
+  searchResults: User[]; 
   selectedUser: User | null;
   isUsersLoading: boolean;
   isMessagesLoading: boolean;
   isOtherUserTyping: boolean;
-  isSearchingUsers: boolean; // New state for search loading
+  isSearchingUsers: boolean; 
   getUsers: () => Promise<void>;
   getMessages: (userId: string) => Promise<void>;
   sendMessage: (messageData: { text?: string; image?: string }) => Promise<void>;
-  searchUsers: (query: string) => Promise<void>; // New method for searching users
-  sendFriendRequest: (receiverId: string) => Promise<void>; // New method for sending friend requests
+  searchUsers: (query: string) => Promise<void>; 
+  sendFriendRequest: (receiverId: string) => Promise<void>; 
   subscribeToMessages: () => void;
   unsubscribeFromMessages: () => void;
   subscribeToTyping: () => void;
   unsubscribeFromTyping: () => void;
   emitTyping: (isTyping: boolean) => void;
   setSelectedUser: (selectedUser: User | null) => void;
+
+  addUserToList: (user: User) => void;
+  subscribeToUpdates: () => void;
+  unsubscribeFromUpdates: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   users: [],
-  searchResults: [], // Initialize search results
+  searchResults: [], 
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
   isOtherUserTyping: false,
-  isSearchingUsers: false, // Initialize search loading state
+  isSearchingUsers: false, 
+
+  addUserToList: (user: User) => {
+    const { users } = get();
+    const userExists = users.some(existingUser => existingUser._id === user._id);
+    
+    if (!userExists) {
+      set({ users: [...users, user] });
+    }
+  },
+
+  subscribeToUpdates: () => {
+    const socket = useAuthStore.getState().socket;
+    
+    socket?.on("addToChatList", (userData: User) => {
+      get().addUserToList(userData);
+    });
+    
+    socket?.on("refreshChatList", () => {
+      const { users } = get();
+      if (users.length === 0) {
+        get().getUsers();
+      }
+    });
+  },
+
+  unsubscribeFromUpdates: () => {
+    const socket = useAuthStore.getState().socket;
+    socket?.off("addToChatList");
+    socket?.off("refreshChatList");
+  },
 
   getUsers: async () => {
     set({ isUsersLoading: true });

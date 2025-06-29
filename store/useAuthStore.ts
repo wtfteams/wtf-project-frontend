@@ -1,6 +1,7 @@
 import { axiosInstance } from "@/api/axios";
 import { io, Socket } from "socket.io-client";
 import { create } from "zustand";
+import { useChatStore } from "./useChatStore";
 
 interface AuthUser {
   _id: string;
@@ -23,10 +24,10 @@ interface AuthState {
   updateProfile: (formData: FormData) => Promise<void>;
   connectSocket: () => void;
   disconnectSocket: () => void;
-  friendRequests: AuthUser[]; // New state for friend requests
-  getFriendRequests: () => Promise<void>; // New method to fetch friend requests
-  subscribeToFriendRequests: () => void; // New method to subscribe to friend request notifications
-  unsubscribeFromFriendRequests: () => void; // New method to unsubscribe
+  friendRequests: AuthUser[]; 
+  getFriendRequests: () => Promise<void>; 
+  subscribeToFriendRequests: () => void; 
+  unsubscribeFromFriendRequests: () => void;
 }
 
 const BASE_URL = "http://localhost:5001";
@@ -135,42 +136,53 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   subscribeToFriendRequests: () => {
-    const socket = get().socket;
-    socket?.on("newFriendRequest", (data: { senderId: string; message: string }) => {
-      // Fetch updated friend requests
-      get().getFriendRequests();
-    });
-  },
+  const socket = get().socket;
+  socket?.on("newFriendRequest", (data: { senderId: string; message: string }) => {
+    get().getFriendRequests();
+  });
+  
+  socket?.on("friendRequestAccepted", (data: { friendId: string; friend: any }) => {
+    get().getFriendRequests();
+  });
+},
 
-  unsubscribeFromFriendRequests: () => {
-    const socket = get().socket;
-    socket?.off("newFriendRequest");
-  },
+unsubscribeFromFriendRequests: () => {
+  const socket = get().socket;
+  socket?.off("newFriendRequest");
+  socket?.off("friendRequestAccepted");
+},
 
-  connectSocket: () => {
-    const { authUser } = get();
-    if (!authUser || get().socket?.connected) return;
+ connectSocket: () => {
+  const { authUser } = get();
+  if (!authUser || get().socket?.connected) return;
 
-    const socket = io(BASE_URL, {
-      query: {
-        userId: authUser._id,
-      },
-    });
-    socket.connect();
+  const socket = io(BASE_URL, {
+    query: {
+      userId: authUser._id,
+    },
+  });
+  socket.connect();
 
-    set({ socket });
+  set({ socket });
 
-    socket.on("getOnlineUsers", (userIds: string[]) => {
-      set({ onlineUsers: userIds });
-    });
-    // Subscribe to friend requests when socket connects
-    get().subscribeToFriendRequests();
-  },
+  socket.on("getOnlineUsers", (userIds: string[]) => {
+    set({ onlineUsers: userIds });
+  });
+  
+  get().subscribeToFriendRequests();
+  
+  const { subscribeToUpdates } = useChatStore.getState();
+  subscribeToUpdates();
+},
 
-  disconnectSocket: () => {
-    if (get().socket?.connected) {
-      get().unsubscribeFromFriendRequests();
-      get().socket?.disconnect();
-    }
-  },
+disconnectSocket: () => {
+  if (get().socket?.connected) {
+    get().unsubscribeFromFriendRequests();
+    
+    const { unsubscribeFromUpdates } = useChatStore.getState();
+    unsubscribeFromUpdates();
+    
+    get().socket?.disconnect();
+  }
+},
 }));
