@@ -81,11 +81,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  unsubscribeFromUpdates: () => {
-    const socket = useAuthStore.getState().socket;
-    socket?.off("addToChatList");
-    socket?.off("refreshChatList");
-  },
+ unsubscribeFromUpdates: () => {
+  const socket = useAuthStore.getState().socket;
+  socket?.off("addToChatList");
+  socket?.off("refreshChatList");
+  socket?.off("friendRequestAccepted");
+},
 
   getUsers: async () => {
     set({ isUsersLoading: true });

@@ -105,7 +105,7 @@ const ChatDetailScreen = () => {
       });
     } catch (error) {
       Alert.alert("Error", "Failed to send message. Please try again.");
-      setMessage(messageText); // Restore message on error
+      setMessage(messageText); 
     } finally {
       setIsSending(false);
     }
