@@ -8,6 +8,7 @@ interface User {
   fullName: string;
   email: string;
   profilePic?: string;
+  friendStatus?: "none" | "sent" | "received" | "friend";
   [key: string]: any;
 }
 
@@ -24,43 +25,101 @@ interface Message {
 interface ChatState {
   messages: Message[];
   users: User[];
-  searchResults: User[]; 
+  searchResults: User[];
   selectedUser: User | null;
   isUsersLoading: boolean;
   isMessagesLoading: boolean;
   isOtherUserTyping: boolean;
-  isSearchingUsers: boolean; 
+  isSearchingUsers: boolean;
+  friendStatusMap: Record<string, string>; // userId -> status
   getUsers: () => Promise<void>;
   getMessages: (userId: string) => Promise<void>;
-  sendMessage: (messageData: { text?: string; image?: string }) => Promise<void>;
-  searchUsers: (query: string) => Promise<void>; 
-  sendFriendRequest: (receiverId: string) => Promise<void>; 
+  sendMessage: (messageData: {
+    text?: string;
+    image?: string;
+  }) => Promise<void>;
+  searchUsers: (query: string) => Promise<void>;
+  sendFriendRequest: (receiverId: string) => Promise<void>;
   subscribeToMessages: () => void;
   unsubscribeFromMessages: () => void;
   subscribeToTyping: () => void;
   unsubscribeFromTyping: () => void;
   emitTyping: (isTyping: boolean) => void;
   setSelectedUser: (selectedUser: User | null) => void;
-
   addUserToList: (user: User) => void;
   subscribeToUpdates: () => void;
   unsubscribeFromUpdates: () => void;
+  updateFriendStatus: (userId: string, status: string) => void;
+  subscribeToFriendStatus: () => void;
+  unsubscribeFromFriendStatus: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   users: [],
-  searchResults: [], 
+  searchResults: [],
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
   isOtherUserTyping: false,
-  isSearchingUsers: false, 
+  isSearchingUsers: false,
+  friendStatusMap: {},
+
+  updateFriendStatus: (userId: string, status: string) => {
+    set((state) => ({
+      friendStatusMap: { ...state.friendStatusMap, [userId]: status },
+      searchResults: state.searchResults.map((user) =>
+        user._id === userId ? { ...user, friendStatus: status as any } : user
+      ),
+    }));
+  },
+
+  subscribeToFriendStatus: () => {
+    const socket = useAuthStore.getState().socket;
+
+    socket?.on(
+      "friendRequestSent",
+      (data: { userId: string; status: string }) => {
+        get().updateFriendStatus(data.userId, data.status);
+      }
+    );
+
+    socket?.on(
+      "friendRequestAccepted",
+      (data: { friendId: string; status: string }) => {
+        get().updateFriendStatus(data.friendId, data.status);
+      }
+    );
+
+    socket?.on(
+      "friendRequestRejected",
+      (data: { userId: string; status: string }) => {
+        get().updateFriendStatus(data.userId, data.status);
+      }
+    );
+
+    socket?.on(
+      "newFriendRequest",
+      (data: { senderId: string; status: string }) => {
+        get().updateFriendStatus(data.senderId, data.status);
+      }
+    );
+  },
+
+  unsubscribeFromFriendStatus: () => {
+    const socket = useAuthStore.getState().socket;
+    socket?.off("friendRequestSent");
+    socket?.off("friendRequestAccepted");
+    socket?.off("friendRequestRejected");
+    socket?.off("newFriendRequest");
+  },
 
   addUserToList: (user: User) => {
     const { users } = get();
-    const userExists = users.some(existingUser => existingUser._id === user._id);
-    
+    const userExists = users.some(
+      (existingUser) => existingUser._id === user._id
+    );
+
     if (!userExists) {
       set({ users: [...users, user] });
     }
@@ -68,25 +127,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   subscribeToUpdates: () => {
     const socket = useAuthStore.getState().socket;
-    
+
     socket?.on("addToChatList", (userData: User) => {
       get().addUserToList(userData);
     });
-    
+
     socket?.on("refreshChatList", () => {
       const { users } = get();
       if (users.length === 0) {
         get().getUsers();
       }
     });
+
+    // Subscribe to friend status updates
+    get().subscribeToFriendStatus();
   },
 
- unsubscribeFromUpdates: () => {
-  const socket = useAuthStore.getState().socket;
-  socket?.off("addToChatList");
-  socket?.off("refreshChatList");
-  socket?.off("friendRequestAccepted");
-},
+  unsubscribeFromUpdates: () => {
+    const socket = useAuthStore.getState().socket;
+    socket?.off("addToChatList");
+    socket?.off("refreshChatList");
+    socket?.off("friendRequestAccepted");
+
+    // Unsubscribe from friend status updates
+    get().unsubscribeFromFriendStatus();
+  },
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -94,7 +159,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const res = await axiosInstance.get("/messages/users");
       set({ users: res.data });
     } catch (error: any) {
-      console.error("Error fetching users:", error.response?.data?.message || error.message);
+      console.error(
+        "Error fetching users:",
+        error.response?.data?.message || error.message
+      );
     } finally {
       set({ isUsersLoading: false });
     }
@@ -106,7 +174,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const res = await axiosInstance.get(`/messages/${userId}`);
       set({ messages: res.data });
     } catch (error: any) {
-      console.error("Error fetching messages:", error.response?.data?.message || error.message);
+      console.error(
+        "Error fetching messages:",
+        error.response?.data?.message || error.message
+      );
     } finally {
       set({ isMessagesLoading: false });
     }
@@ -116,20 +187,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { selectedUser, messages } = get();
     if (!selectedUser) return;
     try {
-      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
+      const res = await axiosInstance.post(
+        `/messages/send/${selectedUser._id}`,
+        messageData
+      );
       set({ messages: [...messages, res.data] });
     } catch (error: any) {
-      console.error("Error sending message:", error.response?.data?.message || error.message);
+      console.error(
+        "Error sending message:",
+        error.response?.data?.message || error.message
+      );
     }
   },
 
   searchUsers: async (query: string) => {
     set({ isSearchingUsers: true });
     try {
-      const res = await axiosInstance.get(`/friends/search?query=${encodeURIComponent(query)}`);
-      set({ searchResults: res.data });
+      const res = await axiosInstance.get(
+        `/friends/search?query=${encodeURIComponent(query)}`
+      );
+      const usersWithStatus = res.data.map((user: User) => ({
+        ...user,
+        friendStatus:
+          user.friendStatus || get().friendStatusMap[user._id] || "none",
+      }));
+      set({ searchResults: usersWithStatus });
     } catch (error: any) {
-      console.error("Error searching users:", error.response?.data?.message || error.message);
+      console.error(
+        "Error searching users:",
+        error.response?.data?.message || error.message
+      );
     } finally {
       set({ isSearchingUsers: false });
     }
@@ -138,7 +225,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendFriendRequest: async (receiverId: string) => {
     try {
       const res = await axiosInstance.post(`/friends/send/${receiverId}`);
-      console.log(res.data.message); 
+      console.log(res.data.message);
+
+      // Optimistically update the UI
+      get().updateFriendStatus(receiverId, "sent");
+
       const { socket, authUser } = useAuthStore.getState();
       if (socket && authUser) {
         socket.emit("sendFriendRequest", {
@@ -147,8 +238,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
       }
     } catch (error: any) {
-      console.error("Error sending friend request:", error.response?.data?.message || error.message);
-      throw new Error(error.response?.data?.message || "Failed to send friend request");
+      console.error(
+        "Error sending friend request:",
+        error.response?.data?.message || error.message
+      );
+      throw new Error(
+        error.response?.data?.message || "Failed to send friend request"
+      );
     }
   },
 
@@ -159,7 +255,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const socket = useAuthStore.getState().socket;
 
     socket?.on("newMessage", (newMessage: Message) => {
-      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
+      const isMessageSentFromSelectedUser =
+        newMessage.senderId === selectedUser._id;
       if (!isMessageSentFromSelectedUser) return;
 
       set({

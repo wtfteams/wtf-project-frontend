@@ -4,13 +4,7 @@ import { Header } from "@/components";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect } from "react";
-import {
-    FlatList,
-    Image,
-    Text,
-    TouchableOpacity,
-    View
-} from "react-native";
+import { FlatList, Image, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface User {
@@ -27,12 +21,18 @@ const FriendRequestsScreen = () => {
     getFriendRequests();
   }, [getFriendRequests]);
 
-  const handleRespondToFriendRequest = async (senderId: string, action: "accept" | "reject") => {
+  const handleRespondToFriendRequest = async (
+    senderId: string,
+    action: "accept" | "reject"
+  ) => {
     try {
       await axiosInstance.post("/friends/respond", { senderId, action });
       getFriendRequests(); // Refresh friend requests
     } catch (error: any) {
-      console.error("Error responding to friend request:", error.response?.data?.message || error.message);
+      console.error(
+        "Error responding to friend request:",
+        error.response?.data?.message || error.message
+      );
     }
   };
 

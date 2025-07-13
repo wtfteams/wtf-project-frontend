@@ -24,12 +24,13 @@ interface User {
 
 const ChatListScreen = () => {
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
-  const { onlineUsers, friendRequests } = useAuthStore();
+  const { onlineUsers, friendRequests, getFriendRequests } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
   useEffect(() => {
     getUsers();
-  }, [getUsers]);
+    getFriendRequests()
+  }, [getUsers,getFriendRequests]);
 
   const filteredUsers = showOnlineOnly
     ? users.filter((user) => onlineUsers.includes(user._id))

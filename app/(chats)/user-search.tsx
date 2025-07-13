@@ -6,13 +6,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -21,14 +21,21 @@ interface User {
   fullName: string;
   email: string;
   profilePic?: string;
+  friendStatus?: "none" | "sent" | "received" | "friend";
 }
 
 const UserSearchScreen = () => {
-  const { searchResults, searchUsers, isSearchingUsers, sendFriendRequest, setSelectedUser } = useChatStore();
+  const {
+    searchResults,
+    searchUsers,
+    isSearchingUsers,
+    sendFriendRequest,
+    setSelectedUser,
+    friendStatusMap,
+  } = useChatStore();
   const { onlineUsers } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [sentRequests, setSentRequests] = useState<string[]>([]); 
 
   useEffect(() => {
     setSearchQuery("");
@@ -49,7 +56,6 @@ const UserSearchScreen = () => {
       console.log("Sending friend request to receiverId:", receiverId);
       await sendFriendRequest(receiverId);
       setError(null);
-      setSentRequests((prev) => [...prev, receiverId]); // Mark as sent
       console.log("Friend request sent successfully");
     } catch (err: any) {
       console.error("Error in handleSendFriendRequest:", err.message);
@@ -58,17 +64,59 @@ const UserSearchScreen = () => {
   };
 
   const handleUserPress = (user: User) => {
-    setSelectedUser(user);
-    router.push(`/(chats)/chat-detail/${user._id}` as any);
+    const friendStatus = getFriendStatus(user);
+    if (friendStatus === "friend") {
+      setSelectedUser(user);
+      router.push(`/(chats)/chat-detail/${user._id}` as any);
+    }
+  };
+
+  const getFriendStatus = (user: User) => {
+    // Check real-time status first, then fallback to user's status
+    return friendStatusMap[user._id] || user.friendStatus || "none";
+  };
+
+  const getButtonConfig = (status: string) => {
+    switch (status) {
+      case "friend":
+        return {
+          text: "Friend",
+          icon: "checkmark-circle",
+          bgColor: "bg-green-600",
+          disabled: true,
+        };
+      case "sent":
+        return {
+          text: "Sent",
+          icon: "time",
+          bgColor: "bg-gray-500",
+          disabled: true,
+        };
+      case "received":
+        return {
+          text: "Accept",
+          icon: "person-add",
+          bgColor: "bg-blue-600",
+          disabled: false,
+        };
+      default:
+        return {
+          text: "Add",
+          icon: "person-add",
+          bgColor: "bg-tertiary",
+          disabled: false,
+        };
+    }
   };
 
   const renderUserItem = ({ item }: { item: User }) => {
     const isOnline = onlineUsers.includes(item._id);
-    const isRequestSent = sentRequests.includes(item._id);
+    const friendStatus = getFriendStatus(item);
+    const buttonConfig = getButtonConfig(friendStatus);
 
     return (
       <TouchableOpacity
-        className="flex-row items-center p-4 border-b border-fourth rounded-[10px] bg-primary"
+        className="flex-row items-center p-4 border-b border-fourth rounded-[10px] bg-primary mb-2"
         onPress={() => handleUserPress(item)}
         activeOpacity={0.7}
       >
@@ -93,13 +141,29 @@ const UserSearchScreen = () => {
             {item.fullName}
           </Text>
           <Text className="text-sm text-gray-400">{item.email}</Text>
+          {friendStatus !== "none" && (
+            <Text className="text-xs text-gray-500 mt-1">
+              {friendStatus === "friend"
+                ? "Friends"
+                : friendStatus === "sent"
+                ? "Request sent"
+                : friendStatus === "received"
+                ? "Wants to be friends"
+                : ""}
+            </Text>
+          )}
         </View>
         <TouchableOpacity
-          className={`py-2 px-3 rounded-[10px] ${isRequestSent ? "bg-gray-500" : "bg-tertiary"}`}
+          className={`py-2 px-3 rounded-[10px] ${buttonConfig.bgColor} ${
+            buttonConfig.disabled ? "opacity-70" : ""
+          }`}
           onPress={() => handleSendFriendRequest(item._id)}
-          disabled={isRequestSent}
+          disabled={buttonConfig.disabled}
         >
-          <Ionicons name={isRequestSent ? "checkmark" : "person-add"} size={20} color="white" />
+          <View className="flex-row items-center space-x-1">
+            <Ionicons name={buttonConfig.icon as any} size={16} color="white" />
+            <Text className="text-white text-xs ml-1">{buttonConfig.text}</Text>
+          </View>
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -124,6 +188,7 @@ const UserSearchScreen = () => {
             onChangeText={setSearchQuery}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
+            autoCapitalize="none"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
