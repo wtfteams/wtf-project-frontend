@@ -14,10 +14,12 @@ interface User {
 
 interface Message {
   _id: string;
-  senderId: string;
-  receiverId: string;
   text?: string;
-  image?: string;
+  mediaType?: "text" | "image" | "video" | "gif" | "file";
+  mediaUrl?: string;
+  thumbnail?: string;
+  fileName?: string;
+  senderId: string;
   createdAt: string;
   [key: string]: any;
 }
@@ -36,7 +38,9 @@ interface ChatState {
   getMessages: (userId: string) => Promise<void>;
   sendMessage: (messageData: {
     text?: string;
-    image?: string;
+    mediaType?: "text" | "image" | "video" | "gif" | "file";
+    mediaUri?: string;
+    fileName?: string;
   }) => Promise<void>;
   searchUsers: (query: string) => Promise<void>;
   sendFriendRequest: (receiverId: string) => Promise<void>;
@@ -183,20 +187,57 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (messageData) => {
+  sendMessage: async (messageData: {
+    text?: string;
+    mediaType?: "text" | "image" | "video" | "gif" | "file";
+    mediaUri?: string;
+    fileName?: string;
+  }) => {
     const { selectedUser, messages } = get();
     if (!selectedUser) return;
+
     try {
+      // For text messages: Send JSON not FormData!
+      if (messageData.mediaType === "text" && !messageData.mediaUri) {
+        const res = await axiosInstance.post(
+          `/messages/send/${selectedUser._id}`,
+          {
+            text: messageData.text,
+            mediaType: "text",
+          }
+        );
+        set({ messages: [...messages, res.data] });
+        return;
+      }
+      // For media messages: Use FormData
+      const formData = new FormData();
+      if (messageData.text) {
+        formData.append("text", messageData.text);
+      }
+      if (messageData.mediaType) {
+        formData.append("mediaType", messageData.mediaType);
+      }
+      if (messageData.mediaUri) {
+        const fileExtension = messageData.mediaUri.split(".").pop();
+        formData.append("media", {
+          uri: messageData.mediaUri,
+          type: `${messageData.mediaType}/${fileExtension}`,
+          name: messageData.fileName || `media.${fileExtension}`,
+        } as any);
+      }
       const res = await axiosInstance.post(
         `/messages/send/${selectedUser._id}`,
-        messageData
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
       set({ messages: [...messages, res.data] });
     } catch (error: any) {
-      console.error(
-        "Error sending message:",
-        error.response?.data?.message || error.message
-      );
+      console.error("Error sending message:", error);
+      throw error;
     }
   },
 

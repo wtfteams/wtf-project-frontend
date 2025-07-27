@@ -2,6 +2,9 @@ import { FeatherIcons } from "@/components";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useChatStore } from "@/store/useChatStore";
 import { Ionicons } from "@expo/vector-icons";
+import { ResizeMode, Video } from "expo-av";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -16,13 +19,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import EmojiSelector from "react-native-emoji-selector";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { moderateScale } from "react-native-size-matters";
 
 interface Message {
   _id: string;
   text?: string;
-  image?: string | null | undefined;
+  mediaType?: "text" | "image" | "video" | "gif" | "file";
+  mediaUrl?: string;
+  thumbnail?: string;
+  fileName?: string;
   senderId: string;
   createdAt: string;
 }
@@ -52,6 +59,77 @@ const ChatDetailScreen = () => {
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
   const flatListRef = useRef<FlatList | null>(null);
+
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setUploading(true);
+      try {
+        await sendMessage({
+          mediaType: "image",
+          mediaUri: result.assets[0].uri,
+          fileName: "image.jpg",
+        });
+      } finally {
+        setUploading(false);
+        setShowMediaOptions(false);
+      }
+    }
+  };
+
+  const pickVideo = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      videoMaxDuration: 60,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setUploading(true);
+      try {
+        await sendMessage({
+          mediaType: "video",
+          mediaUri: result.assets[0].uri,
+          fileName: "video.mp4",
+        });
+      } finally {
+        setUploading(false);
+        setShowMediaOptions(false);
+      }
+    }
+  };
+
+  const pickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+      copyToCacheDirectory: true,
+    });
+
+    if (!result.canceled) {
+      setUploading(true);
+      try {
+        await sendMessage({
+          mediaType: "file",
+          mediaUri: result.assets[0].uri,
+          fileName: result.assets[0].name,
+        });
+      } finally {
+        setUploading(false);
+        setShowMediaOptions(false);
+      }
+    }
+  };
 
   // Find and set the selected user
   useEffect(() => {
@@ -101,11 +179,11 @@ const ChatDetailScreen = () => {
     try {
       await sendMessage({
         text: messageText,
-        image: "",
+        mediaType: "text",
       });
     } catch (error) {
       Alert.alert("Error", "Failed to send message. Please try again.");
-      setMessage(messageText); 
+      setMessage(messageText);
     } finally {
       setIsSending(false);
     }
@@ -146,11 +224,50 @@ const ChatDetailScreen = () => {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  // ADD to renderMessage function in ChatDetailScreen.tsx
+
+  const renderMessage = ({ item }: { item: any }) => {
     const isOwnMessage = item.senderId === authUser?._id;
-    // const senderProfilePic = isOwnMessage
-    //   ? authUser?.profilePic
-    //   : selectedUser?.profilePic;
+
+    const renderMediaContent = () => {
+      switch (item.mediaType) {
+        case "image":
+        case "gif":
+          return (
+            <Image
+              source={{ uri: item.mediaUrl }}
+              className="w-48 h-48 rounded-lg mb-2"
+              resizeMode="cover"
+            />
+          );
+
+        case "video":
+          return (
+            <Video
+              source={{ uri: item.mediaUrl }}
+              className="w-48 h-48 rounded-lg mb-2"
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              posterSource={
+                item.thumbnail ? { uri: item.thumbnail } : undefined
+              }
+            />
+          );
+
+        case "file":
+          return (
+            <TouchableOpacity className="flex-row items-center bg-gray-600 p-3 rounded-lg mb-2">
+              <Ionicons name="document" size={24} color="white" />
+              <Text className="text-white ml-2 flex-1" numberOfLines={1}>
+                {item.fileName || "Document"}
+              </Text>
+            </TouchableOpacity>
+          );
+
+        default:
+          return null;
+      }
+    };
 
     return (
       <View
@@ -168,21 +285,10 @@ const ChatDetailScreen = () => {
                 : "bg-gray-700 rounded-bl-md"
             }`}
           >
-            {item.image && (
-              <Image
-                source={{ uri: item.image }}
-                className="w-48 h-48 rounded-lg mb-2"
-                resizeMode="cover"
-              />
-            )}
-            {item.text && (
-              <Text className={`${isOwnMessage ? "text-white" : "text-white"}`}>
-                {item.text}
-              </Text>
-            )}
+            {renderMediaContent()}
+            {item.text && <Text className="text-white">{item.text}</Text>}
           </View>
-
-          <Text className="text-xs text-gray-400 mt-1 ">
+          <Text className="text-xs text-gray-400 mt-1">
             {formatMessageTime(item.createdAt)}
           </Text>
         </View>
@@ -254,7 +360,6 @@ const ChatDetailScreen = () => {
             <Ionicons name="videocam" size={24} color="white" />
           </TouchableOpacity>
         </View>
-
         {/* Messages */}
         <FlatList
           ref={flatListRef}
@@ -276,10 +381,12 @@ const ChatDetailScreen = () => {
             </View>
           }
         />
-
         {/* Message Input */}
         <View className="flex-row items-center p-4 border-t border-gray-700">
-          <TouchableOpacity className="mr-3">
+          <TouchableOpacity
+            className="mr-3"
+            onPress={() => setShowMediaOptions(!showMediaOptions)}
+          >
             <Ionicons name="add" size={24} color="#6b7280" />
           </TouchableOpacity>
 
@@ -294,13 +401,20 @@ const ChatDetailScreen = () => {
           />
 
           <TouchableOpacity
+            className="mr-3"
+            onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+          >
+            <Text className="text-2xl">😊</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             className={`p-3 rounded-full ${
               message.trim() && !isSending ? "bg-blue-500" : "bg-gray-600"
             }`}
             onPress={handleSend}
-            disabled={!message.trim() || isSending}
+            disabled={(!message.trim() || isSending) && !uploading}
           >
-            {isSending ? (
+            {isSending || uploading ? (
               <ActivityIndicator size={20} color="white" />
             ) : (
               <Ionicons
@@ -311,6 +425,46 @@ const ChatDetailScreen = () => {
             )}
           </TouchableOpacity>
         </View>
+        {/* Media Options Modal */}
+        {showMediaOptions && (
+          <View className="absolute bottom-20 left-4 right-4 bg-gray-800 rounded-lg p-4">
+            <TouchableOpacity
+              className="flex-row items-center py-3"
+              onPress={pickImage}
+            >
+              <Ionicons name="image" size={24} color="white" />
+              <Text className="text-white ml-3">Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-row items-center py-3"
+              onPress={pickVideo}
+            >
+              <Ionicons name="videocam" size={24} color="white" />
+              <Text className="text-white ml-3">Video</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-row items-center py-3"
+              onPress={pickDocument}
+            >
+              <Ionicons name="document" size={24} color="white" />
+              <Text className="text-white ml-3">Document</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <View className="absolute bottom-20 left-0 right-0 h-64">
+            <EmojiSelector
+              onEmojiSelected={(emoji) => {
+                setMessage(message + emoji);
+                setShowEmojiPicker(false);
+              }}
+              showTabs={true}
+              showSearchBar={false}
+              theme="#192230"
+            />
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
