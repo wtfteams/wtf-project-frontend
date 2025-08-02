@@ -206,7 +206,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             mediaType: "text",
           }
         );
-        set({ messages: [...messages, res.data] });
+        // set({ messages: [...messages, res.data] });
         return;
       }
       // For media messages: Use FormData
@@ -292,17 +292,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
-
     const socket = useAuthStore.getState().socket;
-
     socket?.on("newMessage", (newMessage: Message) => {
-      const isMessageSentFromSelectedUser =
-        newMessage.senderId === selectedUser._id;
-      if (!isMessageSentFromSelectedUser) return;
-
-      set({
-        messages: [...get().messages, newMessage],
-      });
+      const { selectedUser } = get();
+      if (selectedUser && (newMessage.senderId === selectedUser._id || newMessage.receiverId === selectedUser._id)) {
+        set({
+          messages: [...get().messages, newMessage],
+        });
+      }
     });
   },
 

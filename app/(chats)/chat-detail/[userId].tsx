@@ -9,7 +9,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -64,26 +63,26 @@ const ChatDetailScreen = () => {
   const [showMediaOptions, setShowMediaOptions] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  const [sendingImages, setSendingImages] = useState(false);
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
     });
 
     if (!result.canceled) {
-      setUploading(true);
-      try {
-        await sendMessage({
-          mediaType: "image",
-          mediaUri: result.assets[0].uri,
-          fileName: "image.jpg",
-        });
-      } finally {
-        setUploading(false);
-        setShowMediaOptions(false);
-      }
+      // result.assets is always present and always an array when not canceled
+      const uris = result.assets.map((a) => a.uri);
+      setSelectedImages((prev) => [...prev, ...uris]);
+      setShowPreview(true);
     }
   };
 
@@ -170,23 +169,17 @@ const ChatDetailScreen = () => {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!message.trim() || !selectedUser?._id || isSending) return;
-
+    if (!message.trim() || !selectedUser?._id) return;
     const messageText = message.trim();
     setMessage("");
-    setIsSending(true);
 
-    try {
-      await sendMessage({
-        text: messageText,
-        mediaType: "text",
-      });
-    } catch (error) {
-      Alert.alert("Error", "Failed to send message. Please try again.");
-      setMessage(messageText);
-    } finally {
-      setIsSending(false);
-    }
+    // Just trigger the send - let socket handle UI update
+    sendMessage({
+      text: messageText,
+      mediaType: "text",
+    }).catch(() => {
+      // Optional: show error
+    });
   };
 
   const handleTyping = (text: string) => {
@@ -310,163 +303,309 @@ const ChatDetailScreen = () => {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-primary"
-    >
-      <View className="flex-1 ">
-        {/* Header */}
-        <View className="flex-row items-center p-4 border-b border-gray-700">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
-            <FeatherIcons
-              icon="back-arrow"
-              iconWidth={moderateScale(24)}
-              iconHeight={moderateScale(24)}
-              iconStrokeColor="white"
-            />
-          </TouchableOpacity>
-
-          <View className="relative">
+    <>
+      {showPreview && (
+        <View className="absolute inset-0 bg-black z-20 flex-1 justify-center items-center">
+          {/* Main Preview */}
+          {selectedImages.length > 0 && (
             <Image
-              source={{
-                uri:
-                  selectedUser?.profilePic ||
-                  "https://via.placeholder.com/40x40/cccccc/ffffff?text=U",
+              source={{ uri: selectedImages[previewIndex] }}
+              style={{
+                width: 340,
+                height: 340,
+                borderRadius: 14,
+                marginBottom: 12,
+                marginTop: 18,
+                borderWidth: 2,
+                borderColor: "#2563eb",
               }}
-              className="w-10 h-10 rounded-full mr-3 bg-red-50"
+              resizeMode="cover"
             />
-            {selectedUser?._id && onlineUsers.includes(selectedUser?._id) && (
-              <View className="absolute bottom-0 right-3 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-            )}
-          </View>
-          <View className="flex-1">
-            <Text className="text-white font-semibold text-lg">
-              {selectedUser?.fullName || selectedUser?.name || "User"}
-            </Text>
-            <Text className="text-gray-400 text-sm">
-              {isOtherUserTyping
-                ? "Typing..."
-                : selectedUser?._id && onlineUsers.includes(selectedUser?._id)
-                ? "Online"
-                : "Offline"}
-            </Text>
-          </View>
+          )}
 
-          <TouchableOpacity className="p-2">
-            <Ionicons name="call" size={24} color="white" />
+          {/* Row of Thumbnails */}
+          {selectedImages.length > 1 && (
+            <FlatList
+              data={selectedImages}
+              horizontal
+              style={{ maxHeight: 84, marginBottom: 12 }}
+              contentContainerStyle={{ alignItems: "center" }}
+              keyExtractor={(item, i) => item + i}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity
+                  onPress={() => setPreviewIndex(index)}
+                  style={{
+                    borderWidth: previewIndex === index ? 2 : 0,
+                    borderColor: "#2563eb",
+                    borderRadius: 8,
+                    marginHorizontal: 5,
+                  }}
+                >
+                  <Image
+                    source={{ uri: item }}
+                    style={{ width: 70, height: 70, borderRadius: 8 }}
+                  />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+
+          {/* Plus Button */}
+          <TouchableOpacity
+            onPress={pickImage}
+            style={{
+              position: "absolute",
+              bottom: 90,
+              left: 30,
+              backgroundColor: "#2563eb",
+              borderRadius: 30,
+              padding: 15,
+            }}
+          >
+            <Ionicons name="add" size={28} color="white" />
           </TouchableOpacity>
-
-          <TouchableOpacity className="p-2 ml-2">
-            <Ionicons name="videocam" size={24} color="white" />
+          {/* Message input with send */}
+          <View
+            style={{
+              position: "absolute",
+              bottom: 30,
+              width: "100%",
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 20,
+            }}
+          >
+            <TextInput
+              style={{
+                flex: 1,
+                backgroundColor: "#374151",
+                color: "white",
+                borderRadius: 20,
+                paddingHorizontal: 16,
+                marginRight: 10,
+              }}
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Add a message (optional)"
+              placeholderTextColor="#9ca3af"
+              multiline
+            />
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#1d4ed8",
+                padding: 12,
+                borderRadius: 999,
+                alignItems: "center",
+                opacity: sendingImages ? 0.5 : 1,
+              }}
+              disabled={sendingImages || selectedImages.length === 0}
+              onPress={async () => {
+                setSendingImages(true);
+                try {
+                  await Promise.all(
+                    selectedImages.map((image) =>
+                      sendMessage({
+                        text: message || undefined,
+                        mediaType: "image",
+                        mediaUri: image,
+                        fileName: "image.jpg",
+                      })
+                    )
+                  );
+                  setSelectedImages([]);
+                  setShowPreview(false);
+                  setMessage("");
+                  setPreviewIndex(0); // reset
+                } catch (err) {
+                  // show error if desired
+                } finally {
+                  setSendingImages(false);
+                }
+              }}
+            >
+              {sendingImages ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Ionicons name="send" size={22} color="white" />
+              )}
+            </TouchableOpacity>
+          </View>
+          {/* Cancel Button (optional) */}
+          <TouchableOpacity
+            style={{ position: "absolute", top: 40, right: 20, padding: 8 }}
+            onPress={() => {
+              setShowPreview(false);
+              setSelectedImages([]);
+            }}
+          >
+            <Ionicons name="close" size={28} color="white" />
           </TouchableOpacity>
         </View>
-        {/* Messages */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item._id}
-          renderItem={renderMessage}
-          contentContainerStyle={{ paddingTop: 20, paddingBottom: 20 }}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={
-            <View className="flex-1 justify-center items-center py-20">
-              <Ionicons name="chatbubbles-outline" size={64} color="#6b7280" />
-              <Text className="text-gray-400 text-center mt-4">
-                No messages yet. Start the conversation!
+      )}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1 bg-primary"
+      >
+        <View className="flex-1 ">
+          {/* Header */}
+          <View className="flex-row items-center p-4 border-b border-gray-700">
+            <TouchableOpacity onPress={() => router.back()} className="mr-3">
+              <FeatherIcons
+                icon="back-arrow"
+                iconWidth={moderateScale(24)}
+                iconHeight={moderateScale(24)}
+                iconStrokeColor="white"
+              />
+            </TouchableOpacity>
+
+            <View className="relative">
+              <Image
+                source={{
+                  uri:
+                    selectedUser?.profilePic ||
+                    "https://via.placeholder.com/40x40/cccccc/ffffff?text=U",
+                }}
+                className="w-10 h-10 rounded-full mr-3 bg-red-50"
+              />
+              {selectedUser?._id && onlineUsers.includes(selectedUser?._id) && (
+                <View className="absolute bottom-0 right-3 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+              )}
+            </View>
+            <View className="flex-1">
+              <Text className="text-white font-semibold text-lg">
+                {selectedUser?.fullName || selectedUser?.name || "User"}
+              </Text>
+              <Text className="text-gray-400 text-sm">
+                {isOtherUserTyping
+                  ? "Typing..."
+                  : selectedUser?._id && onlineUsers.includes(selectedUser?._id)
+                  ? "Online"
+                  : "Offline"}
               </Text>
             </View>
-          }
-        />
-        {/* Message Input */}
-        <View className="flex-row items-center p-4 border-t border-gray-700">
-          <TouchableOpacity
-            className="mr-3"
-            onPress={() => setShowMediaOptions(!showMediaOptions)}
-          >
-            <Ionicons name="add" size={24} color="#6b7280" />
-          </TouchableOpacity>
 
-          <TextInput
-            className="flex-1 bg-gray-700 text-white rounded-full px-4 py-3 mr-3"
-            placeholder="Type a message..."
-            placeholderTextColor="#9ca3af"
-            value={message}
-            onChangeText={handleTyping}
-            multiline
-            maxLength={1000}
-          />
-
-          <TouchableOpacity
-            className="mr-3"
-            onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-          >
-            <Text className="text-2xl">😊</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className={`p-3 rounded-full ${
-              message.trim() && !isSending ? "bg-blue-500" : "bg-gray-600"
-            }`}
-            onPress={handleSend}
-            disabled={(!message.trim() || isSending) && !uploading}
-          >
-            {isSending || uploading ? (
-              <ActivityIndicator size={20} color="white" />
-            ) : (
-              <Ionicons
-                name="send"
-                size={20}
-                color={message.trim() ? "white" : "#9ca3af"}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-        {/* Media Options Modal */}
-        {showMediaOptions && (
-          <View className="absolute bottom-20 left-4 right-4 bg-gray-800 rounded-lg p-4">
-            <TouchableOpacity
-              className="flex-row items-center py-3"
-              onPress={pickImage}
-            >
-              <Ionicons name="image" size={24} color="white" />
-              <Text className="text-white ml-3">Photo</Text>
+            <TouchableOpacity className="p-2">
+              <Ionicons name="call" size={24} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity
-              className="flex-row items-center py-3"
-              onPress={pickVideo}
-            >
+
+            <TouchableOpacity className="p-2 ml-2">
               <Ionicons name="videocam" size={24} color="white" />
-              <Text className="text-white ml-3">Video</Text>
             </TouchableOpacity>
+          </View>
+          {/* Messages */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item._id}
+            renderItem={renderMessage}
+            contentContainerStyle={{ paddingTop: 20, paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: true })
+            }
+            onLayout={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
+            ListEmptyComponent={
+              <View className="flex-1 justify-center items-center py-20">
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={64}
+                  color="#6b7280"
+                />
+                <Text className="text-gray-400 text-center mt-4">
+                  No messages yet. Start the conversation!
+                </Text>
+              </View>
+            }
+          />
+          {/* Message Input */}
+          <View className="flex-row items-center p-4 border-t border-gray-700">
             <TouchableOpacity
-              className="flex-row items-center py-3"
-              onPress={pickDocument}
+              className="mr-3"
+              onPress={() => setShowMediaOptions(!showMediaOptions)}
             >
-              <Ionicons name="document" size={24} color="white" />
-              <Text className="text-white ml-3">Document</Text>
+              <Ionicons name="add" size={24} color="#6b7280" />
+            </TouchableOpacity>
+
+            <TextInput
+              className="flex-1 bg-gray-700 text-white rounded-full px-4 py-3 mr-3"
+              placeholder="Type a message..."
+              placeholderTextColor="#9ca3af"
+              value={message}
+              onChangeText={handleTyping}
+              multiline
+              maxLength={1000}
+            />
+
+            <TouchableOpacity
+              className="mr-3"
+              onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+            >
+              <Text className="text-2xl">😊</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className={`p-3 rounded-full ${
+                message.trim() && !isSending ? "bg-blue-500" : "bg-gray-600"
+              }`}
+              onPress={handleSend}
+              disabled={(!message.trim() || isSending) && !uploading}
+            >
+              {isSending || uploading ? (
+                <ActivityIndicator size={20} color="white" />
+              ) : (
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={message.trim() ? "white" : "#9ca3af"}
+                />
+              )}
             </TouchableOpacity>
           </View>
-        )}
-        {/* Emoji Picker */}
-        {showEmojiPicker && (
-          <View className="absolute bottom-20 left-0 right-0 h-64">
-            <EmojiSelector
-              onEmojiSelected={(emoji) => {
-                setMessage(message + emoji);
-                setShowEmojiPicker(false);
-              }}
-              showTabs={true}
-              showSearchBar={false}
-              theme="#192230"
-            />
-          </View>
-        )}
-      </View>
-    </KeyboardAvoidingView>
+          {/* Media Options Modal */}
+          {showMediaOptions && (
+            <View className="absolute bottom-20 left-4 right-4 bg-gray-800 rounded-lg p-4">
+              <TouchableOpacity
+                className="flex-row items-center py-3"
+                onPress={pickImage}
+              >
+                <Ionicons name="image" size={24} color="white" />
+                <Text className="text-white ml-3">Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-row items-center py-3"
+                onPress={pickVideo}
+              >
+                <Ionicons name="videocam" size={24} color="white" />
+                <Text className="text-white ml-3">Video</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-row items-center py-3"
+                onPress={pickDocument}
+              >
+                <Ionicons name="document" size={24} color="white" />
+                <Text className="text-white ml-3">Document</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {/* Emoji Picker */}
+          {showEmojiPicker && (
+            <View className="absolute bottom-20 left-0 right-0 h-64">
+              <EmojiSelector
+                onEmojiSelected={(emoji) => {
+                  setMessage(message + emoji);
+                  setShowEmojiPicker(false);
+                }}
+                showTabs={true}
+                showSearchBar={false}
+                theme="#192230"
+              />
+            </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </>
   );
 };
 
